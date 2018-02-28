@@ -41,6 +41,8 @@ public class ApiController {
 		MongoDAO dao = MongoDAO.getInstance();
 
 		User userSave = dao.saveUser(user);
+		
+		user.setPassword(null);
 
 		return userSave;
 
@@ -48,6 +50,9 @@ public class ApiController {
 
 	@RequestMapping(value="/updateUser/{id}", method= RequestMethod.POST, consumes= MediaType.APPLICATION_FORM_URLENCODED_VALUE)
 	public @ResponseBody User updateUser(User user, @PathVariable("id") String id){
+		
+		User resUser = null;
+		
 		if(user.getPassword() != null){
 			user.setPassword(BCrypt.hashpw(user.getPassword(), BCrypt.gensalt()));
 		}
@@ -64,9 +69,11 @@ public class ApiController {
 		if(user.getEmail() != null) userUpdate.setEmail(user.getEmail()); 
 		if(user.getImage() != null) userUpdate.setImage(user.getImage()); 
 		
+		resUser = dao.saveUser(userUpdate);
 		
-
-		return dao.saveUser(userUpdate);
+		resUser.setPassword(null);
+		
+		return resUser;
 
 	}
 
@@ -90,6 +97,8 @@ public class ApiController {
 		if(BCrypt.checkpw(user.getPassword(), userLogin.getPassword())){
 			token = TokenGenerate.getToken(userLogin);
 		}
+		
+		System.out.println(TokenGenerate.decodeUserToken(token));
 		
 		return token;		
 	}

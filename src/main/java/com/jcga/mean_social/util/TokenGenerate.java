@@ -16,10 +16,6 @@ import com.jcga.mean_social.models.User;
 
 public class TokenGenerate {
 
-	public TokenGenerate(){
-
-
-	}
 
 	public static String getToken(User user){
 

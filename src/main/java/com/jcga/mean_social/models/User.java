@@ -4,11 +4,14 @@ import org.bson.types.ObjectId;
 import org.mongodb.morphia.annotations.Entity;
 import org.mongodb.morphia.annotations.Id;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
 @Entity(value="users", noClassnameStored = true)
+@JsonIgnoreProperties({"id"})
 public class User {
-	
+
 	@Id
-    private ObjectId id;
+	private ObjectId id;
 	private String name;
 	private String surname;
 	private String nick;
@@ -16,7 +19,7 @@ public class User {
 	private String password;
 	private String role;
 	private String image;
-	
+
 	public ObjectId getId() {
 		return id;
 	}
@@ -65,6 +68,6 @@ public class User {
 	public void setImage(String image) {
 		this.image = image;
 	}
-	
+
 
 }
