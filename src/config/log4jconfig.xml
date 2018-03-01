@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="error" name="MyApp" packages="">
+  <Appenders>
+    <RollingFile name="MyFile" fileName="C:\Users\dell\Desktop\project\workspace\mean-social\logs\mean-social.log"
+    			filePattern="C:\Users\dell\Desktop\project\workspace\mean-social\logs\mean-social-%d{yyyy-MM-dd_hh_mm_ss}.log" append="true">
+      <PatternLayout pattern="%d{DEFAULT} %-5p %c - %m%n"/>
+      <Policies>
+        <SizeBasedTriggeringPolicy size="10 MB" />
+      </Policies>
+      <DefaultRolloverStrategy max="3" />
+    </RollingFile>
+  </Appenders>
+  <Loggers>
+    <Root level="debug">
+      <AppenderRef ref="MyFile"/>
+    </Root>
+  </Loggers>
+</Configuration>
