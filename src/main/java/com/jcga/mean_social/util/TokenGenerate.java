@@ -24,10 +24,9 @@ public class TokenGenerate {
 
 		String token = null;
 
-		ObjectToJson otj = ObjectToJson.getInstance();
-
+		
 		try{
-			String userJson = otj.toJson(user);
+			String userJson = ObjectToJson.toJson(user);
 
 			Algorithm algorithmHS = Algorithm.HMAC256("secret");
 

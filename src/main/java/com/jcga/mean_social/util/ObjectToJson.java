@@ -7,32 +7,40 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+/**
+ * Clase que convierte objetos en json y convierte json a objetos de una clase dada
+ * @author camilo.gaspar10@gmail.com
+ *
+ */
 public class ObjectToJson {
 
-	private static ObjectToJson INSTANCE;
-	private ObjectMapper mapper;
-	
-	private ObjectToJson(){
-		if(this.mapper == null){
-			this.mapper = new ObjectMapper();
-		}
-	}
-	
-	public static ObjectToJson getInstance(){
-		if(INSTANCE == null){
-			INSTANCE = new ObjectToJson();
-		}
-		return INSTANCE;
-	}
-	
-	public String toJson(Object objeto) throws JsonProcessingException{
+	/**
+	 * Método encargado de convertir en un string con formato JSON un objeto recibido por parámetro
+	 * @param objeto Objeto a convertir en JSON
+	 * @return String en formato JSON con información del objeto
+	 * @throws JsonProcessingException
+	 */
+	public static String toJson(Object objeto) throws JsonProcessingException{
 		
-		String json = this.mapper.writeValueAsString(objeto);
+		ObjectMapper mapper = new ObjectMapper();
+		
+		String json = mapper.writeValueAsString(objeto);
 		
 		return json;		
 	}
 	
-	public <T> T toObject(Class<T> clase, String json) throws JsonParseException, JsonMappingException, IOException{
+	/**
+	 * Método encargado de convertir un String con formato JSON a un Objeto de tipo dado por parámetro 
+	 * @param clase Tipo que tendrá el objeto resultante
+	 * @param json String en formato Json con la información que tendrá el objeto
+	 * @return Objeto con la información del Json seteada
+	 * @throws JsonParseException
+	 * @throws JsonMappingException
+	 * @throws IOException
+	 */
+	public static <T> T toObject(Class<T> clase, String json) throws JsonParseException, JsonMappingException, IOException{
+		
+		ObjectMapper mapper = new ObjectMapper();
 		
 		T objeto = mapper.readValue(json, clase);
 		

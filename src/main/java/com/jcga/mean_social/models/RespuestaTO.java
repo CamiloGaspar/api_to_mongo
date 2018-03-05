@@ -1,6 +1,6 @@
 package com.jcga.mean_social.models;
 
-public class ErrorTO {
+public class RespuestaTO {
 	
 	private int status;
 	private String message;
