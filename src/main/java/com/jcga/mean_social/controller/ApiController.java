@@ -18,28 +18,192 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.jcga.mean_social.exceptions.AuthException;
+import com.jcga.mean_social.exceptions.UserFindException;
+import com.jcga.mean_social.exceptions.UserNoInsertException;
 import com.jcga.mean_social.middleware.AuthMiddleware;
-import com.jcga.mean_social.models.RespuestaTO;
 import com.jcga.mean_social.models.PruebaTO;
+import com.jcga.mean_social.models.RespuestaTO;
+import com.jcga.mean_social.models.TokenTO;
 import com.jcga.mean_social.models.User;
 import com.jcga.mean_social.persistence.mongodb.MongoDAO;
 import com.jcga.mean_social.util.ObjectToJson;
 import com.jcga.mean_social.util.TokenGenerate;
 
-
+/**
+ * Clase encargada de recibir las peticiones por HTTP 
+ * @author camilo.gaspar10@gmail.com
+ *
+ */
 @RestController
 public class ApiController {
 
+	/**
+	 * Instancia encargada de escribir en el log
+	 */
 	private static final Logger logger = LogManager.getLogger(ApiController.class);
-	private MongoDAO dao;
 
-	public  ApiController() {
-		this.dao = MongoDAO.getInstance();
+
+	/**
+	 * Método encargado de registrar un usuario en la base de datos
+	 * @param user Usuario que se quiere registrar 
+	 * @return Usuario que se registró o mensaje en caso de que se generara algún error
+	 */
+	@RequestMapping(value="/register", method= RequestMethod.POST, consumes= MediaType.APPLICATION_FORM_URLENCODED_VALUE)
+	public @ResponseBody String registro(User user){
+
+		//TODO Validar token
+		logger.debug("Se accedió al método de registro por la ruta /register mediante un método post");
+		String jRespuesta = null;
+		try {
+			try{
+				if(user.getName() != null && user.getSurname() != null && user.getEmail() != null 
+						&& user.getNick() != null && user.getPassword() != null){
+
+					MongoDAO dao = MongoDAO.getInstance();
+
+					User exist = dao.getUserBy("email", user.getEmail());
+
+					if(exist == null){
+						user.setPassword(BCrypt.hashpw(user.getPassword(), BCrypt.gensalt()));
+						user.setRole("ROLE_USER");
+						user.setImage(null);
+						User userSave = dao.saveUser(user);
+						userSave.setPassword(null);
+
+						jRespuesta = ObjectToJson.toJson(userSave);
+
+					} else{
+
+						jRespuesta = this.respuesta(500, "No llegaron los datos necesarios del usuarios a registrar");
+					}
+				} else {
+
+					jRespuesta = this.respuesta(500, "No llegaron todos los datos del usuarios a registrar");
+				}
+			} catch (UserNoInsertException e) {
+
+				jRespuesta = this.respuesta(500, e.getMessage());
+			} catch (UserFindException e) {
+
+				jRespuesta = this.respuesta(500, e.getMessage());
+			}
+		} catch (JsonProcessingException e) {
+			logger.error("Error al convertir en JSON el objeto ErrorTO");
+			jRespuesta = "Error al convertir en JSON el objeto ErrorTO";
+		} 
+		return jRespuesta;
 	}
 
+	/**
+	 * Método encargado de verificar si el usuario dado existe en base de datos y sus credenciales son correctas.
+	 * <br>
+	 *  En caso de ser correctas devuelve un token con la información del usuario
+	 * @param user Usuario que intenta ingresar
+	 * @return Token que contiene la información del usuario o mensaje en caso de que se genere algún error 
+	 */
+	@RequestMapping(value="/login", method=RequestMethod.POST, consumes= MediaType.APPLICATION_FORM_URLENCODED_VALUE)
+	public @ResponseBody String loginUser(User user){
+
+		//TODO Validar token
+		String jRespuesta = null;
+		try{
+			try {
+				if(user != null && user.getEmail() != null && user.getPassword() != null){
+					MongoDAO dao = MongoDAO.getInstance();
+
+					User userLogin = dao.getUserBy("email", user.getEmail());
+					if(userLogin != null){
+						if(BCrypt.checkpw(user.getPassword(), userLogin.getPassword())){
+
+							TokenTO token = new TokenTO();
+
+							token.setToken(TokenGenerate.getToken(userLogin));
+							jRespuesta = ObjectToJson.toJson(token);
+						} else {
+
+							jRespuesta = this.respuesta(500, "Contraseña incorrecta");
+						}
+					} else {
+
+						jRespuesta = this.respuesta(500, "El usuario "+user.getEmail()+" no existe en la base de datos");
+					} 
+				} else { 
+
+					jRespuesta = this.respuesta(500, "No se ha suministrado el correo o la contraseña");
+				}
+
+			} catch (UserFindException e) {
+
+				jRespuesta = this.respuesta(500, e.getMessage());
+			}
+
+		} catch(JsonProcessingException e){
+			logger.error("Error al convertir en JSON el objeto ErrorTO");
+			jRespuesta = "Error al convertir en JSON el objeto ErrorTO";
+		}
+		return jRespuesta;		
+	}
+
+	/**
+	 * Método encargado de obtener la información del usuario solicitado
+	 * @param id Id del usuario que se desea consultar en base de datos 
+	 * @param actUserToken Token del usuario que hace la petición
+	 * @return Usuario que se consulto o mensaje en caso de que se genere algún error
+	 */
+	@RequestMapping(value="/user/{id}", method=RequestMethod.GET )
+	public @ResponseBody String getUser(@PathVariable("id") String id, @RequestHeader(value="Authorization") String actUserToken){
+
+		String jRespuesta = null;
+		try{
+			if(actUserToken != null){
+				try{
+					User userToken = AuthMiddleware.isValid(actUserToken);
+					if(userToken != null){
+
+						if(id != null){
+
+							MongoDAO dao = MongoDAO.getInstance();
+
+							User user = dao.getUserById(id);
+							if(user != null){
+
+								jRespuesta = ObjectToJson.toJson(user);
+							} else {
+
+								jRespuesta = this.respuesta(500, "No existe el usuario con id: "+id);
+							}
+						} else {
+
+							jRespuesta = this.respuesta(500, "No se ha suministrado la id del usuario");
+						}
+					} else {
+
+						jRespuesta = this.respuesta(500, "Token inválido");
+					}
+				} catch(UserFindException e){
+
+					jRespuesta = this.respuesta(500, e.getMessage());
+				} catch (AuthException e) {
+
+					jRespuesta = this.respuesta(500, e.getMessage());
+				}
+
+			} else {
+
+				jRespuesta = this.respuesta(500, "La petición no tiene la cabecera de autenticación");
+			}
+		} catch(JsonProcessingException e){
+
+			logger.error("Error al convertir en JSON el objeto ErrorTO");
+			jRespuesta = "Error al convertir en JSON el objeto ErrorTO";
+		} 
+		return jRespuesta;
+	}
+
+	/*
 	@RequestMapping(value="/prueba", method= RequestMethod.POST, consumes= MediaType.APPLICATION_FORM_URLENCODED_VALUE)
 	public @ResponseBody String prueba(PruebaTO prueba, @RequestHeader(value="Authorization") String actUserToken){
 
@@ -73,25 +237,8 @@ public class ApiController {
 
 		return respuesta;
 	}
+	 */
 
-	@RequestMapping(value="/register", method= RequestMethod.POST, consumes= MediaType.APPLICATION_FORM_URLENCODED_VALUE)
-	public @ResponseBody User registro(User user){
-
-		logger.debug("Se accedió al método de registro por la ruta /register mediante un método post");
-
-		user.setPassword(BCrypt.hashpw(user.getPassword(), BCrypt.gensalt()));
-		user.setRole("USER_ROLE");
-		user.setImage(null);
-
-		MongoDAO dao = MongoDAO.getInstance();
-
-		User userSave = dao.saveUser(user);
-
-		user.setPassword(null);
-
-		return userSave;
-
-	}
 
 	@RequestMapping(value="/updateUser/{id}", method= RequestMethod.POST, consumes= MediaType.APPLICATION_FORM_URLENCODED_VALUE)
 	public @ResponseBody User updateUser(User user, @PathVariable("id") String id){
@@ -122,56 +269,53 @@ public class ApiController {
 
 	}
 
-	@RequestMapping(value="/user/{id}", method=RequestMethod.GET )
-	public @ResponseBody User getUser(@PathVariable("id") String id){
 
-		MongoDAO dao = MongoDAO.getInstance();
 
-		User user = dao.getUserById(id);
 
-		return user;
-	}
-
-	@RequestMapping(value="/login", method=RequestMethod.POST, consumes= MediaType.APPLICATION_FORM_URLENCODED_VALUE)
-	public @ResponseBody String loginUser(User user){
-
-		MongoDAO dao = MongoDAO.getInstance();
-		String token = null;
-
-		User userLogin = dao.getUserBy("email", user.getEmail());
-
-		if(BCrypt.checkpw(user.getPassword(), userLogin.getPassword())){
-			token = TokenGenerate.getToken(userLogin);
-		}
-
-		return token;		
-	}
-
-	@RequestMapping(value="/upload-image", method=RequestMethod.POST, consumes=MediaType.MULTIPART_FORM_DATA_VALUE)
-	public String singleFileUpload(@RequestParam("image") MultipartFile file) {
+	/**
+	 * Método encargado de almacenar una imagen en un FS definido y de agregarla a un usuario
+	 * @param file Imagen que se desea almacenar
+	 * @param id Id del usuario al que se le desea agregar la imagen
+	 * @return Mensaje de respuesta a la petición
+	 */
+	@RequestMapping(value="/upload-image/{id}", method=RequestMethod.POST, consumes=MediaType.MULTIPART_FORM_DATA_VALUE)
+	public String singleFileUpload(@RequestParam("image") MultipartFile file, @PathVariable("id") String id) {
 
 		RespuestaTO respuesta = null;
-		String JRespuesta = null;
+		String jRespuesta = null;
 
 		try{
 			if (file.isEmpty()) {
 				respuesta = new RespuestaTO();
 				respuesta.setStatus(400);
 				respuesta.setMessage("No se adjunto imagen");
-				JRespuesta = ObjectToJson.toJson(respuesta);
+				jRespuesta = ObjectToJson.toJson(respuesta);
 			} else{
 
 				try {
 
-					// Get the file and save it somewhere
-					byte[] bytes = file.getBytes();
-					Path path = Paths.get("C:\\Users\\dell\\Desktop\\" + file.getOriginalFilename());
-					Files.write(path, bytes);
-					
-					respuesta = new RespuestaTO();
-					respuesta.setStatus(200);
-					respuesta.setMessage("Se adjuntó correctamente la imagen.");
-					JRespuesta = ObjectToJson.toJson(respuesta);
+					String extFile = file.getOriginalFilename().substring(file.getOriginalFilename().lastIndexOf('.'));
+
+					if(extFile.toUpperCase().equals(".PNG") || extFile.toUpperCase().equals(".JPG") 
+							|| extFile.toUpperCase().equals(".JPEG") || extFile.toUpperCase().equals(".GIF")){
+
+
+						// Obtiene el archivo y lo guarda en la ruta especificada
+						byte[] bytes = file.getBytes();
+						Path path = Paths.get("C:\\Users\\dell\\Desktop\\" + file.getOriginalFilename());
+						Files.write(path, bytes);
+
+						respuesta = new RespuestaTO();
+						respuesta.setStatus(200);
+						respuesta.setMessage("Se adjuntó correctamente la imagen.");
+						jRespuesta = ObjectToJson.toJson(respuesta);
+					} else{
+
+						respuesta = new RespuestaTO();
+						respuesta.setStatus(400);
+						respuesta.setMessage("Formato de la imagen: "+extFile+" no es valido");
+						jRespuesta = ObjectToJson.toJson(respuesta);
+					}
 
 
 				} catch (IOException e) {
@@ -180,9 +324,21 @@ public class ApiController {
 			}
 		} catch(JsonProcessingException e){
 			logger.error("Error al convertir en JSON el objeto ErrorTO");
-			JRespuesta = "Error al convertir en JSON el objeto ErrorTO";
+			jRespuesta = "Error al convertir en JSON el objeto ErrorTO";
 		}
-		return JRespuesta;
+		return jRespuesta;
+	}
+
+	private String respuesta(int status, String message) throws JsonProcessingException{
+
+		String jRespuesta;
+
+		RespuestaTO respuesta = new RespuestaTO();
+		respuesta.setStatus(status);
+		respuesta.setMessage(message);
+		jRespuesta = ObjectToJson.toJson(respuesta);
+
+		return jRespuesta;
 	}
 
 }

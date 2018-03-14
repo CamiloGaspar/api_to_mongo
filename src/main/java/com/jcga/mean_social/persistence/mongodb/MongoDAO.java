@@ -5,6 +5,8 @@ import org.mongodb.morphia.Datastore;
 import org.mongodb.morphia.Morphia;
 import org.mongodb.morphia.query.Query;
 
+import com.jcga.mean_social.exceptions.UserFindException;
+import com.jcga.mean_social.exceptions.UserNoInsertException;
 import com.jcga.mean_social.models.User;
 import com.mongodb.MongoClient;
 
@@ -37,30 +39,47 @@ public class MongoDAO {
 		return INSTANCE;
 	}
 
-	public User getUserById(String id){
+	public User getUserById(String id) throws UserFindException{
 		User user = null;
+		
+		try{
 		ObjectId userId = new ObjectId(id);
 		user = ds.get(User.class, userId);
-
+		} catch (Exception e){
+			throw new UserFindException("Error al buscar el usuario con id: "+ id, e);
+		}
 
 		return user;
 	}
-	
-	public User getUserBy(String campo, String valor){
+
+	public User getUserBy(String campo, String valor) throws UserFindException{
+
 		User user = null;
-		Query<User> query = ds.createQuery(User.class);
-		
-		query.field(campo).equal(valor);
-		
-		user= query.get();
-		
+		try{
+			Query<User> query = ds.createQuery(User.class);
+
+			query.field(campo).equal(valor);
+
+			user= query.get();
+		} catch (Exception e){
+			throw new UserFindException("Error al buscar el usuario con "+campo+" = "+valor, e);
+		}
 		return user;
 	}
-	
-	public User saveUser(User user){
-		 ds.save(user);
-		 return user;
+
+	public User saveUser(User user) throws UserNoInsertException{
+		try{
+			ds.save(user);
+		} catch (Exception e){
+			throw new UserNoInsertException("No se ha agregado el usuario "+user.getEmail(), e);
+		}
+		return user;
 	}
-	
-	
+
+	public void close(){
+		if(mongoClient != null){
+			mongoClient.close();
+		}
+	}
+
 }
